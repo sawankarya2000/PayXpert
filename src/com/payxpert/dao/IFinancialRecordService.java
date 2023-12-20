@@ -1,4 +1,4 @@
-package com.payxpert.dao.service;
+package com.payxpert.dao;
 
 import com.payxpert.entity.FinancialRecord;
 import com.payxpert.exception.EmployeeNotFoundException;
