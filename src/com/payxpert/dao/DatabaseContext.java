@@ -1,8 +1,10 @@
 package com.payxpert.dao;
 
 import com.payxpert.entity.Employee;
+import com.payxpert.entity.FinancialRecord;
 import com.payxpert.entity.Gender;
 import com.payxpert.exception.DatabaseConnectionException;
+import com.payxpert.exception.FinancialRecordException;
 import com.payxpert.util.DBUtil;
 import com.payxpert.exception.EmployeeNotFoundException;
 
@@ -170,5 +172,140 @@ public class DatabaseContext {
             var resultSet = checkStatement.executeQuery();
             return resultSet.next();
         }
+    }
+
+    public static boolean employeeExists(int employeeId) throws DatabaseConnectionException {
+        String checkQuery = "SELECT COUNT(*) FROM employees WHERE employeeID=?";
+        try(Connection conn = DBUtil.getDBConn()) {
+            try (PreparedStatement checkStatement = conn.prepareStatement(checkQuery)) {
+                checkStatement.setInt(1, employeeId);
+                var resultSet = checkStatement.executeQuery();
+                return resultSet.next();
+            }
+        } catch(SQLException e) {
+            throw new DatabaseConnectionException();
+        }
+    }
+
+    public static void addFinancialRecord(int employeeId, String description, double amount, String recordType) throws DatabaseConnectionException {
+        // Sql query to insert financial records
+        String sql = "INSERT INTO financial_records (employeeId, description, amount, recordType, recordDate) VALUES (?, ?, ?, ?, ?)";
+        try(Connection conn = DBUtil.getDBConn()) {
+            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+                preparedStatement.setInt(1, employeeId);
+                preparedStatement.setString(2, description);
+                preparedStatement.setDouble(3, amount);
+                preparedStatement.setString(4, recordType);
+                preparedStatement.setDate(5, Date.valueOf(LocalDate.now()));
+
+                int rowsAffected = preparedStatement.executeUpdate();
+
+                if (rowsAffected > 0) {
+                    System.out.println("Financial record added successfully!");
+                } else {
+                    throw new FinancialRecordException("Failed to add financial record.");
+                }
+            }
+        } catch (FinancialRecordException e) {
+            System.out.println(e.getMessage());
+        }
+        catch (SQLException e) {
+            throw new DatabaseConnectionException();
+        }
+    }
+
+    public static FinancialRecord getFinancialRecordById(int recordId) throws DatabaseConnectionException {
+        try (Connection conn = DBUtil.getDBConn()) {
+            // SQL query to retrieve data
+            String sql = "SELECT * FROM financial_records WHERE recordId = ?";
+
+            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+                preparedStatement.setInt(1, recordId);
+
+                // Execute the query
+                ResultSet resultSet = preparedStatement.executeQuery();
+                    if (resultSet.next()) {
+                        return createFinancialRecord(resultSet);
+                    }
+            }catch (SQLException e) {
+                throw new FinancialRecordException();
+            }
+        } catch (FinancialRecordException e) {
+            System.out.println(e.getMessage());
+        } catch (SQLException e) {
+            throw new DatabaseConnectionException();
+        }
+
+        // Return null if any error occurs
+        return null;
+    }
+
+    public static List<FinancialRecord> getFinancialRecordsForEmployee(int employeeId) throws DatabaseConnectionException {
+        List<FinancialRecord> records = new ArrayList<>();
+
+        try (Connection conn = DBUtil.getDBConn()) {
+            // Create the SQL query
+            String sql = "SELECT * FROM financial_records WHERE employeeId = ?";
+
+            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+                preparedStatement.setInt(1, employeeId);
+
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    while (resultSet.next()) {
+                        // Create a FinancialRecord object from each row and add it to the list
+                        FinancialRecord financialRecord = createFinancialRecord(resultSet);
+                        records.add(financialRecord);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new FinancialRecordException();
+            }
+        } catch(FinancialRecordException e) {
+            System.out.println(e.getMessage());
+        }catch (SQLException e) {
+            throw new DatabaseConnectionException();
+        }
+
+        return records;
+    }
+
+    public static List<FinancialRecord> getFinancialRecordsForDate(LocalDate recordDate) throws DatabaseConnectionException {
+        List<FinancialRecord> records = new ArrayList<>();
+
+        try (Connection conn = DBUtil.getDBConn()) {
+            // Create the SQL query
+            String sql = "SELECT * FROM financial_records WHERE recordDate = ?";
+
+            try (PreparedStatement preparedStatement = conn.prepareStatement(sql)) {
+                preparedStatement.setDate(1, Date.valueOf(recordDate));
+
+                // Execute the query
+                try (ResultSet resultSet = preparedStatement.executeQuery()) {
+                    while (resultSet.next()) {
+                        // Create a FinancialRecord object from each row and add it to the list
+                        FinancialRecord financialRecord = createFinancialRecord(resultSet);
+                        records.add(financialRecord);
+                    }
+                }
+            } catch (SQLException e) {
+                throw new FinancialRecordException();
+            }
+        } catch(FinancialRecordException e) {
+            System.out.println(e.getMessage());
+        }catch (SQLException e) {
+            throw new DatabaseConnectionException();
+        }
+
+        return records;
+    }
+    public static FinancialRecord createFinancialRecord(ResultSet resultSet) throws SQLException {
+        return new FinancialRecord(
+                resultSet.getInt("recordId"),
+                resultSet.getInt("employeeId"),
+                resultSet.getDate("recordDate").toLocalDate(),
+                resultSet.getString("description"),
+                resultSet.getDouble("amount"),
+                resultSet.getString("recordType")
+        );
     }
 }
